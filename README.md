@@ -1,3 +1,7 @@
+# DISCLAIMER
+
+_I didn't have the time to properly handle credentials within the 30-minute timebox and didn't want to temper with the result, so I kept it as it was, as much as it pains me to do so. I just added the DEMO_KEY in its place in the last commit, but the test commit is still in the commit three._
+
 # NASA APOD Flutter App
 
 A beautiful, offline-capable mobile application that displays NASA's Astronomy Picture of the Day (APOD) with advanced caching, search functionality, and detailed image viewing.

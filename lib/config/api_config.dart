@@ -1,6 +1,6 @@
 class ApiConfig {
   // NASA API Configuration
-  static const String nasaApiKey = 'nG0NTHAoaaM6ofwe9HUqgDoLdEIFBiy2A1NQQ968'; // Replace with your actual API key
+  static const String nasaApiKey = 'DEMO_KEY'; // Replace with your actual API key
   
   // API Endpoints
   static const String nasaApodBaseUrl = 'https://api.nasa.gov/planetary/apod';
