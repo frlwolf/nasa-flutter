@@ -5,6 +5,7 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
   final TextEditingController searchController;
   final VoidCallback onSearchToggle;
   final ValueChanged<String>? onSearchChanged;
+  final String? subtitle;
 
   const SearchAppBar({
     super.key,
@@ -12,12 +13,13 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.searchController,
     required this.onSearchToggle,
     this.onSearchChanged,
+    this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      title: isSearchVisible ? _buildSearchField() : const Text('NASA APOD'),
+      title: isSearchVisible ? _buildSearchField() : _buildTitle(),
       backgroundColor: Theme.of(context).colorScheme.primary,
       foregroundColor: Colors.white,
       actions: [
@@ -27,6 +29,26 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
       ],
     );
+  }
+
+  Widget _buildTitle() {
+    if (subtitle != null) {
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'NASA APOD',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+          ),
+          Text(
+            subtitle!,
+            style: const TextStyle(fontSize: 12, color: Colors.white70),
+          ),
+        ],
+      );
+    }
+    return const Text('NASA APOD');
   }
 
   Widget _buildSearchField() {

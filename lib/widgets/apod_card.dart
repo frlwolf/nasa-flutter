@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/apod_item.dart';
+import 'apod_image.dart';
 
 class ApodCard extends StatelessWidget {
   final ApodItem item;
@@ -34,64 +35,16 @@ class ApodCard extends StatelessWidget {
   }
 
   Widget _buildImageSection(BuildContext context) {
-    return Container(
-      height: 200,
-      width: double.infinity,
-      decoration: BoxDecoration(
+    return Hero(
+      tag: 'apod_image_${item.date}',
+      child: ApodImage(
+        item: item,
+        height: 200,
+        width: double.infinity,
+        fit: BoxFit.cover,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Theme.of(context).colorScheme.primary.withOpacity(0.8),
-            Theme.of(context).colorScheme.secondary.withOpacity(0.6),
-          ],
-        ),
-      ),
-      child: Stack(
-        children: [
-          // Placeholder for now - will be replaced with actual image
-          const Center(
-            child: Icon(
-              Icons.image,
-              size: 64,
-              color: Colors.white70,
-            ),
-          ),
-          
-          // Media type indicator
-          if (item.mediaType == 'video')
-            const Positioned(
-              top: 12,
-              right: 12,
-              child: Icon(
-                Icons.play_circle_filled,
-                color: Colors.white,
-                size: 32,
-              ),
-            ),
-          
-          // Copyright indicator
-          if (item.copyright != null)
-            Positioned(
-              bottom: 8,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  '© ${item.copyright}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                  ),
-                ),
-              ),
-            ),
-        ],
+        showVideoIndicator: true,
+        showCopyright: true,
       ),
     );
   }

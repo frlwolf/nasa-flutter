@@ -1,11 +1,32 @@
-class ApodItem {
+import 'package:hive/hive.dart';
+
+part 'apod_item.g.dart';
+
+@HiveType(typeId: 0)
+class ApodItem extends HiveObject {
+  @HiveField(0)
   final String title;
+  
+  @HiveField(1)
   final String date;
+  
+  @HiveField(2)
   final String explanation;
+  
+  @HiveField(3)
   final String url;
+  
+  @HiveField(4)
   final String? hdurl;
+  
+  @HiveField(5)
   final String mediaType;
+  
+  @HiveField(6)
   final String? copyright;
+  
+  @HiveField(7)
+  final DateTime cachedAt;
 
   ApodItem({
     required this.title,
@@ -15,7 +36,8 @@ class ApodItem {
     this.hdurl,
     this.mediaType = 'image',
     this.copyright,
-  });
+    DateTime? cachedAt,
+  }) : cachedAt = cachedAt ?? DateTime.now();
 
   // Factory constructor for creating ApodItem from JSON
   factory ApodItem.fromJson(Map<String, dynamic> json) {
@@ -52,6 +74,7 @@ class ApodItem {
     String? hdurl,
     String? mediaType,
     String? copyright,
+    DateTime? cachedAt,
   }) {
     return ApodItem(
       title: title ?? this.title,
@@ -61,6 +84,7 @@ class ApodItem {
       hdurl: hdurl ?? this.hdurl,
       mediaType: mediaType ?? this.mediaType,
       copyright: copyright ?? this.copyright,
+      cachedAt: cachedAt ?? this.cachedAt,
     );
   }
 

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/apod_item.dart';
 import '../widgets/apod_card.dart';
 import '../widgets/search_app_bar.dart';
+import '../services/nasa_api_service.dart';
+import '../services/hive_service.dart';
+import 'apod_detail_screen.dart';
 
 class ApodListScreen extends StatefulWidget {
   const ApodListScreen({super.key});
@@ -12,47 +15,21 @@ class ApodListScreen extends StatefulWidget {
 
 class _ApodListScreenState extends State<ApodListScreen> {
   final TextEditingController _searchController = TextEditingController();
-  bool _isSearchVisible = false;
-  List<ApodItem> _filteredItems = [];
+  final NasaApiService _apiService = NasaApiService();
   
-  // Mock data for demonstration - will be replaced with real data later
-  final List<ApodItem> _mockItems = [
-    ApodItem(
-      title: "The Horsehead Nebula",
-      date: "2024-01-15",
-      explanation: "One of the most identifiable nebulae in the sky, the Horsehead Nebula in Orion, is part of a large, dark, molecular cloud. This image shows the nebula in infrared light, revealing details normally hidden by dust.",
-      url: "https://example.com/image1.jpg",
-      hdurl: "https://example.com/hd_image1.jpg",
-      copyright: "NASA/ESA",
-    ),
-    ApodItem(
-      title: "Saturn's Rings in Infrared",
-      date: "2024-01-14", 
-      explanation: "What do Saturn's rings look like in infrared light? The answer is revealed in this false-color composite image from the Cassini spacecraft. The different colors represent different ring particle compositions and temperatures.",
-      url: "https://example.com/image2.jpg",
-      mediaType: "image",
-    ),
-    ApodItem(
-      title: "Galaxy Collision in NGC 6302",
-      date: "2024-01-13",
-      explanation: "The bright clusters and nebulae of planet Earth's night sky are often named for flowers or insects. Though its wingspan covers over 3 light-years, NGC 6302 is no exception. With an estimated surface temperature of about 36,000 degrees C, the central star of this particular planetary nebula has become exceptionally hot, shining brightly in ultraviolet light but hidden from direct view by a dense torus of dust.",
-      url: "https://example.com/image3.jpg",
-      copyright: "Hubble Heritage Team",
-    ),
-    ApodItem(
-      title: "Mars Rover Video: Descent and Landing",
-      date: "2024-01-12",
-      explanation: "This video shows the dramatic descent and landing of NASA's Perseverance rover on Mars. The footage was captured by multiple cameras during the final minutes of the rover's journey to the Red Planet.",
-      url: "https://example.com/video1.mp4",
-      mediaType: "video",
-    ),
-  ];
+  bool _isSearchVisible = false;
+  bool _isLoading = true;
+  bool _isShowingCachedData = false;
+  String? _error;
+  
+  List<ApodItem> _allItems = [];
+  List<ApodItem> _filteredItems = [];
 
   @override
   void initState() {
     super.initState();
-    _filteredItems = _mockItems;
     _searchController.addListener(_onSearchChanged);
+    _loadApodData();
   }
 
   @override
@@ -62,13 +39,86 @@ class _ApodListScreenState extends State<ApodListScreen> {
     super.dispose();
   }
 
+  Future<void> _loadApodData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      // STEP 1: Load from cache first (instant display)
+      final cachedItems = HiveService.getApodItemsSorted();
+      
+      if (cachedItems.isNotEmpty) {
+        setState(() {
+          _allItems = cachedItems;
+          _filteredItems = cachedItems;
+          _isLoading = false; // Show cached data immediately
+          _isShowingCachedData = true;
+        });
+      }
+
+      // STEP 2: Try to refresh from API in background
+      await _refreshFromApi();
+      
+    } catch (e) {
+      // If cache loading fails, try API directly
+      await _refreshFromApi();
+    }
+  }
+
+  Future<void> _refreshFromApi() async {
+    try {
+      // Load recent APOD items from API (last 30 days)
+      final apiItems = await _apiService.getRecentApods(days: 30);
+      
+      // Update UI with fresh data from API
+      setState(() {
+        _allItems = apiItems;
+        _filteredItems = apiItems;
+        _isLoading = false;
+        _error = null;
+        _isShowingCachedData = false; // Now showing fresh data
+      });
+      
+    } catch (e) {
+      // If API fails but we have cached data, keep showing cached data
+      if (_allItems.isEmpty) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      } else {
+        // Show a subtle indication that refresh failed but cache is being used
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.cloud_off, color: Colors.white, size: 16),
+                  SizedBox(width: 8),
+                  Text('Showing cached data - refresh failed'),
+                ],
+              ),
+              backgroundColor: Colors.orange[700],
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   void _onSearchChanged() {
     final query = _searchController.text.toLowerCase();
     setState(() {
       if (query.isEmpty) {
-        _filteredItems = _mockItems;
+        _filteredItems = _allItems;
       } else {
-        _filteredItems = _mockItems.where((item) {
+        _filteredItems = _allItems.where((item) {
           return item.title.toLowerCase().contains(query) ||
                  item.date.contains(query) ||
                  item.explanation.toLowerCase().contains(query);
@@ -82,7 +132,7 @@ class _ApodListScreenState extends State<ApodListScreen> {
       _isSearchVisible = !_isSearchVisible;
       if (!_isSearchVisible) {
         _searchController.clear();
-        _filteredItems = _mockItems;
+        _filteredItems = _allItems;
       }
     });
   }
@@ -95,6 +145,7 @@ class _ApodListScreenState extends State<ApodListScreen> {
         searchController: _searchController,
         onSearchToggle: _toggleSearch,
         onSearchChanged: (value) => _onSearchChanged(),
+        subtitle: _isShowingCachedData ? 'Showing cached data' : null,
       ),
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
@@ -104,8 +155,29 @@ class _ApodListScreenState extends State<ApodListScreen> {
   }
 
   Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Loading NASA APOD data...'),
+          ],
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return _buildErrorState();
+    }
+
     if (_filteredItems.isEmpty && _searchController.text.isNotEmpty) {
       return _buildEmptySearchResult();
+    }
+
+    if (_filteredItems.isEmpty) {
+      return _buildEmptyState();
     }
 
     return ListView.builder(
@@ -118,6 +190,75 @@ class _ApodListScreenState extends State<ApodListScreen> {
           onTap: () => _navigateToDetail(item),
         );
       },
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Colors.red[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Oops! Something went wrong',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: Colors.red[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _error ?? 'Unknown error occurred',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadApodData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.image_not_supported,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No APOD data available',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Pull to refresh to try loading data again',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Colors.grey[500],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -151,26 +292,14 @@ class _ApodListScreenState extends State<ApodListScreen> {
   }
 
   Future<void> _handleRefresh() async {
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
-    
-    // TODO: Implement actual data refresh from API
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Data refreshed!'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+    // Force refresh from API (user explicitly requested fresh data)
+    await _refreshFromApi();
   }
 
   void _navigateToDetail(ApodItem item) {
-    // TODO: Navigate to detail screen
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Opening: ${item.title}'),
-        duration: const Duration(seconds: 2),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ApodDetailScreen(item: item),
       ),
     );
   }

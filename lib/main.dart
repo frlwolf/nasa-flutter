@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'screens/apod_list_screen.dart';
+import 'services/hive_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Hive
+  await HiveService.init();
+  
   runApp(const NasaApodApp());
 }
 
